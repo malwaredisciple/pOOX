@@ -110,9 +110,9 @@ class OOXMLparser:
         if self._has_macros:
             print('[+] contains VBA macros -> {}'.format(self.vba_bin))
         if self._has_remote_template:
-            print('[+] remote template injection -> {}'.format(self._remote_template))
+            print('[+] template injection -> {}'.format(self._remote_template))
         if self._has_remote_frame:
-            print('[+] remote frame injection -> {}'.format(self.remote_frame))
+            print('[+] frame injection -> {}'.format(self.remote_frame))
         if self._has_embeddings:
             print('[+] contains embedded files -> {}'.format(self.embeddings))
         if self._has_ole:
