@@ -207,7 +207,7 @@ class OOXMLparser:
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print('[-] requires full path to sample')
+        print('[-] requires full path to sample\nUsage: python3 pOOX.py sample.docx')
         sys.exit()
     parser = OOXMLparser(sys.argv[1])
     parser.start()
