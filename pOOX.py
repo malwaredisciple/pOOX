@@ -25,6 +25,7 @@ class OOXMLparser:
     TYPE_TEMPLATE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate'
     TYPE_VBA_PROJ = 'http://schemas.microsoft.com/office/2006/relationships/vbaProject'
     TYPE_EXTERNAL_LINK = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink'
+    TYPE_MACRO_SHEET = 'http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet'
     TYPE_EXTERNAL = 'External'
 
     def __init__(self, file_path):
@@ -147,10 +148,11 @@ class OOXMLparser:
         print('\n+{}+\n|pOOX Report|\n+{}+'.format('-' * 11, '-' * 11))
 
     def set_doc_rels(self):
-        if self._is_xls and 'sheet1.xml.rels' in os.listdir('{}/worksheets/_rels'.format(self.doc_dir)):
-            self.docs_rels.add('{}/worksheets/_rels/sheet1.xml.rels'.format(self.doc_dir))
         if self._is_xls and 'workbook.xml.rels' in os.listdir('{}/_rels'.format(self.doc_dir)):
             self.docs_rels.add('{}/_rels/workbook.xml.rels'.format(self.doc_dir))
+        if self._is_xls and 'worksheets' in os.listdir('{}/'.format(self.doc_dir)):
+            if 'sheet1.xml.rels' in os.listdir('{}/worksheets/_rels'.format(self.doc_dir)):
+                self.docs_rels.add('{}/worksheets/_rels/sheet1.xml.rels'.format(self.doc_dir))
         if self._is_doc and 'settings.xml.rels' in os.listdir('{}/_rels'.format(self.doc_dir)):
             self.docs_rels.add('{}/_rels/settings.xml.rels'.format(self.doc_dir))
         if self._is_doc and 'document.xml.rels' in os.listdir('{}/_rels'.format(self.doc_dir)):
@@ -182,6 +184,12 @@ class OOXMLparser:
                     self.external_link_xml = rel.getAttribute('Target')
                     self.parse_rels({'{}/externalLinks/_rels/{}.rels'.format(
                         self.doc_dir, self.external_link_xml.split('/')[-1])})
+                elif rel.getAttribute('Type') == self.TYPE_MACRO_SHEET:
+                    self._has_macro_sheet = True
+                    self.macro_sheet_xml = rel.getAttribute('Target')
+                    self.parse_rels({'{}/macrosheets/_rels/{}.rels'.format(
+                        self.doc_dir, self.macro_sheet_xml.split('/')[-1]
+                    )})
 
     def parse_main_xml(self):
         if re.findall('DDEAUTO', self.main_xml):
@@ -211,3 +219,4 @@ if __name__ == '__main__':
         sys.exit()
     parser = OOXMLparser(sys.argv[1])
     parser.start()
+
