@@ -1,6 +1,9 @@
 """
 This tool was created by @malwaredisciple to automate the triaging
-of malware samples of the OOXML file format.
+of malware samples of the OOXML / Microsoft 2007+ file format.
+
+Please report all bugs or improvements to:
+https://github.com/malwaredisciple/pOOX
 """
 
 from zipfile import ZipFile
@@ -10,16 +13,18 @@ import os
 import re
 import xml.dom.minidom
 import hashlib
+import sys
 
 
 class OOXMLparser:
     """
-    docstring
+    Base class for parsing OOXML samples
     """
     TYPE_OLE_OBJ = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject'
     TYPE_FRAME = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/frame'
     TYPE_TEMPLATE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate'
     TYPE_VBA_PROJ = 'http://schemas.microsoft.com/office/2006/relationships/vbaProject'
+    TYPE_EXTERNAL_LINK = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink'
     TYPE_EXTERNAL = 'External'
 
     def __init__(self, file_path):
@@ -42,6 +47,10 @@ class OOXMLparser:
         self.vba_bin = None
         self._has_ole = False
         self._has_dde = False
+        self._has_external_link = False
+        self.external_link_file = None
+        self.external_link_xml = None
+        self._dde_command = None
         self._remote_template = None
         self.remote_frame = None
         self.ole_object = None
@@ -49,8 +58,10 @@ class OOXMLparser:
         self.docs_rels = set()
 
     def unzip(self):
-        with ZipFile(self.file_path) as zip:
-            zip.extractall(self.new_dir)
+        if self.file_data[:2] == b'PK':
+            with ZipFile(self.file_path) as zip:
+                zip.extractall(self.new_dir)
+                return 1
 
     def set_type(self):
         dirs = os.listdir(self.new_dir)
@@ -95,6 +106,7 @@ class OOXMLparser:
 
     def print_analysis(self):
         print('\nAnalysis:')
+        print('[+] de-archived sample written to -> {}/'.format(self.new_dir))
         if self._has_macros:
             print('[+] contains VBA macros -> {}'.format(self.vba_bin))
         if self._has_remote_template:
@@ -105,6 +117,10 @@ class OOXMLparser:
             print('[+] contains embedded files -> {}'.format(self.embeddings))
         if self._has_ole:
             print('[+] contains oleobject -> {}'.format(self.ole_object))
+        if self._has_dde:
+            print('[+] contains DDE command -> {}/'.format(self._dde_command))
+        if self._has_external_link:
+            print('[+] contains external link to file -> {} -> {}'.format(self.external_link_xml, self.external_link_file))
 
     def print_tree(self):
         print('\nTree View of De-archived OOXML:\n{}'.format('-' * 31))
@@ -145,7 +161,9 @@ class OOXMLparser:
     def parse_rels(self, doc_rels):
         for rels in doc_rels:
             for rel in xml.dom.minidom.parse(rels).getElementsByTagName('Relationship'):
-                if rel.getAttribute('Type') == self.TYPE_OLE_OBJ:
+                if rel.getAttribute('Type') == self.TYPE_OLE_OBJ and self._has_external_link:
+                    self.external_link_file = rel.getAttribute('Target')
+                elif rel.getAttribute('Type') == self.TYPE_OLE_OBJ:
                     self._has_ole = True
                     self.ole_object = rel.getAttribute('Target')
                 elif rel.getAttribute('Type') == self.TYPE_VBA_PROJ:
@@ -159,6 +177,16 @@ class OOXMLparser:
                       and rel.getAttribute('TargetMode') == self.TYPE_EXTERNAL):
                     self._has_remote_frame = True
                     self.remote_frame = rel.getAttribute('Target')
+                elif rel.getAttribute('Type') == self.TYPE_EXTERNAL_LINK:
+                    self._has_external_link = True
+                    self.external_link_xml = rel.getAttribute('Target')
+                    self.parse_rels({'{}/externalLinks/_rels/{}.rels'.format(
+                        self.doc_dir, self.external_link_xml.split('/')[-1])})
+
+    def parse_main_xml(self):
+        if re.findall('DDEAUTO', self.main_xml):
+            self._has_dde = True
+            self._dde_command = re.findall('DDEAUTO(?:(?!<).)*', self.main_xml)
 
     def start(self):
         try:
@@ -169,6 +197,8 @@ class OOXMLparser:
         self.set_type()
         self.set_doc_dir()
         self.set_embeddings()
+        self.get_main_xml_data()
+        self.parse_main_xml()
         self.set_doc_rels()
         self.parse_rels(self.docs_rels)
         self.print_report()
@@ -176,6 +206,8 @@ class OOXMLparser:
 
 
 if __name__ == '__main__':
-    parser = OOXMLparser('/Users/slayer/samples/PAYMENT_COPY_MT103.xlsx')
+    if len(sys.argv) < 2:
+        print('[-] requires full path to sample')
+        sys.exit()
+    parser = OOXMLparser(sys.argv[1])
     parser.start()
-
