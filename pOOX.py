@@ -26,6 +26,7 @@ class OOXMLparser:
     TYPE_VBA_PROJ = 'http://schemas.microsoft.com/office/2006/relationships/vbaProject'
     TYPE_EXTERNAL_LINK = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink'
     TYPE_MACRO_SHEET = 'http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet'
+    TYPE_HYPERLINK = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink'
     TYPE_EXTERNAL = 'External'
 
     def __init__(self, file_path):
@@ -47,12 +48,14 @@ class OOXMLparser:
         self._has_remote_frame = False
         self._has_macros = False
         self._has_xl4_macros = False
+        self._has_hyperlink = False
         self.vba_bin = None
         self._has_ole = False
         self._has_dde = False
         self._has_external_link = False
         self.external_link_file = None
         self.external_link_xml = None
+        self.hyper_links = []
         self._dde_command = None
         self._remote_template = None
         self.remote_frame = None
@@ -133,6 +136,9 @@ class OOXMLparser:
             print('[+] contains Excel 4.0 Macros')
             if self.xl4_macro_command:
                 print('[+] Excel 4.0 Macro Command -> {}'.format(self.xl4_macro_command))
+        if self._has_hyperlink:
+            print('[+] contains hyperlinks: ')
+            [print(link) for link in self.hyper_links]
 
     def print_tree(self):
         print('\nTree View of De-archived OOXML:\n{}'.format('-' * 31))
@@ -201,6 +207,9 @@ class OOXMLparser:
                     self.macro_sheet_xml = rel.getAttribute('Target')
                     self.macro_sheet = self.get_data('{}/{}'.format(self.doc_dir, self.macro_sheet_xml))
                     self.parse_macro_sheet()
+                elif rel.getAttribute('Type') == self.TYPE_HYPERLINK:
+                    self._has_hyperlink = True
+                    self.hyper_links.append(rel.getAttribute('Target'))
 
     def parse_main_xml(self):
         if re.findall('DDEAUTO', self.main_xml):
