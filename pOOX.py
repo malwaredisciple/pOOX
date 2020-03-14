@@ -49,6 +49,7 @@ class OOXMLparser:
         self._has_macros = False
         self._has_xl4_macros = False
         self._has_hyperlink = False
+        self._has_macro_sheet =  False
         self.vba_bin = None
         self._has_ole = False
         self._has_dde = False
@@ -56,7 +57,9 @@ class OOXMLparser:
         self.external_link_file = None
         self.external_link_xml = None
         self.hyper_links = []
+        self.macro_sheet = None
         self._dde_command = None
+        self.xl4_macro_command = None
         self._remote_template = None
         self.remote_frame = None
         self.ole_object = None
@@ -248,3 +251,4 @@ if __name__ == '__main__':
         sys.exit()
     parser = OOXMLparser(sys.argv[1])
     parser.start()
+
