@@ -40,11 +40,13 @@ class OOXMLparser:
         self._is_doc = False
         self._is_ppt = False
         self.main_xml = False
+        self.app_xml = None
         self.doc_dir = None
         self._has_embeddings = False
         self._has_remote_template = False
         self._has_remote_frame = False
         self._has_macros = False
+        self._has_xl4_macros = False
         self.vba_bin = None
         self._has_ole = False
         self._has_dde = False
@@ -89,10 +91,14 @@ class OOXMLparser:
         elif self._is_ppt:
             self.main_xml = self.get_data('{}/presentation.xml'.format(self.doc_dir))
 
+    def get_app_xml_data(self):
+        if self._is_xls:
+            self.app_xml = self.get_data('{}/docProps/app.xml'.format(self.new_dir))
+
     def set_embeddings(self):
         if 'embeddings' in os.listdir(self.new_dir) or 'embeddings' in os.listdir(self.doc_dir):
             self._has_embeddings = True
-            self.embeddings = os.listdir('{}/embeddings'.format(self.doc_dir))
+            self.embeddings = os.listdir('{}/embeddings'.format(self.new_dir))
 
     @staticmethod
     def get_data(path):
@@ -121,7 +127,12 @@ class OOXMLparser:
         if self._has_dde:
             print('[+] contains DDE command -> {}/'.format(self._dde_command))
         if self._has_external_link:
-            print('[+] contains external link to file -> {} -> {}'.format(self.external_link_xml, self.external_link_file))
+            print('[+] contains external link to file -> {} -> {}'.format(
+                self.external_link_xml, self.external_link_file))
+        if self._has_xl4_macros:
+            print('[+] contains Excel 4.0 Macros')
+            if self.xl4_macro_command:
+                print('[+] Excel 4.0 Macro Command -> {}'.format(self.xl4_macro_command))
 
     def print_tree(self):
         print('\nTree View of De-archived OOXML:\n{}'.format('-' * 31))
@@ -151,7 +162,8 @@ class OOXMLparser:
         if self._is_xls and 'workbook.xml.rels' in os.listdir('{}/_rels'.format(self.doc_dir)):
             self.docs_rels.add('{}/_rels/workbook.xml.rels'.format(self.doc_dir))
         if self._is_xls and 'worksheets' in os.listdir('{}/'.format(self.doc_dir)):
-            if 'sheet1.xml.rels' in os.listdir('{}/worksheets/_rels'.format(self.doc_dir)):
+            if '_rels' in os.listdir('{}/worksheets/'.format(self.doc_dir)):
+            #if 'sheet1.xml.rels' in os.listdir('{}/worksheets/_rels'.format(self.doc_dir)):
                 self.docs_rels.add('{}/worksheets/_rels/sheet1.xml.rels'.format(self.doc_dir))
         if self._is_doc and 'settings.xml.rels' in os.listdir('{}/_rels'.format(self.doc_dir)):
             self.docs_rels.add('{}/_rels/settings.xml.rels'.format(self.doc_dir))
@@ -187,14 +199,20 @@ class OOXMLparser:
                 elif rel.getAttribute('Type') == self.TYPE_MACRO_SHEET:
                     self._has_macro_sheet = True
                     self.macro_sheet_xml = rel.getAttribute('Target')
-                    self.parse_rels({'{}/macrosheets/_rels/{}.rels'.format(
-                        self.doc_dir, self.macro_sheet_xml.split('/')[-1]
-                    )})
+                    self.macro_sheet = self.get_data('{}/{}'.format(self.doc_dir, self.macro_sheet_xml))
+                    self.parse_macro_sheet()
 
     def parse_main_xml(self):
         if re.findall('DDEAUTO', self.main_xml):
             self._has_dde = True
             self._dde_command = re.findall('DDEAUTO(?:(?!<).)*', self.main_xml)
+
+    def parse_macro_sheet(self):
+        self.xl4_macro_command = re.findall('EXEC\(.*?\)', self.macro_sheet)[0]
+
+    def parse_app_xml(self):
+        if self._is_xls and re.findall('Excel\s4\.0\s', self.app_xml):
+            self._has_xl4_macros = True
 
     def start(self):
         try:
@@ -206,7 +224,9 @@ class OOXMLparser:
         self.set_doc_dir()
         self.set_embeddings()
         self.get_main_xml_data()
+        self.get_app_xml_data()
         self.parse_main_xml()
+        self.parse_app_xml()
         self.set_doc_rels()
         self.parse_rels(self.docs_rels)
         self.print_report()
@@ -219,4 +239,3 @@ if __name__ == '__main__':
         sys.exit()
     parser = OOXMLparser(sys.argv[1])
     parser.start()
-
